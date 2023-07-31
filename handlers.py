@@ -16,6 +16,7 @@ async def process_start_handler(message: Message) -> None:
 @router.message(Text(text = text.prof_true))
 async def process_prof_true_hendler(message: Message) -> None:
     await message.answer(text.prof_text.format(name = message.from_user.full_name), reply_markup=ReplyKeyboardRemove())
+
 # Обработичк нажатия кнопки для перехода к вакансиям
 @router.message(Text(text = text.prof_false))
 async def process_prof_false_hendler(message: Message) -> None:
@@ -25,5 +26,4 @@ async def process_prof_false_hendler(message: Message) -> None:
 @router.message(Command(commands=['help']))
 async def process_help_command(message: Message):
     await message.answer(text.help)
-
 
