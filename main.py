@@ -7,6 +7,7 @@ from config import BOT_TOKEN
 from handlers import router
 import text
 
+
 # Обработчик комнды /start
 @router.message(Command(commands=["start"]))
 async def command_start_handler(message: Message) -> None:
