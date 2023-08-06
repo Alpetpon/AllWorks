@@ -18,6 +18,17 @@ async def process_start_handler(message: Message) -> None:
 async def process_help_command(message: Message):
     await message.answer(text.help.format(name = message.from_user.full_name))
 
+
+
+#это код с гита. Кнопка назад. Мб сработает
+@dp.callback_query_handler(text="Start")
+async def start_callback(query: CallbackQuery):
+    await query.message.edit_text(text=start_text, reply_markup=kb.keyboard)
+
+
+
+
+
 # Обработичк нажатия кнопки для прохождения теста профориентации
 @router.message(Text(text = text.prof_true))
 async def process_prof_true_hendler(message: Message) -> None:
