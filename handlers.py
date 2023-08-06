@@ -12,6 +12,12 @@ router = Router()
 async def process_start_handler(message: Message) -> None:
     await message.answer(text.greet.format(name = message.from_user.full_name), reply_markup=kb.keyboard)
 
+
+#со стака. хз мб сработает
+@dp.callback_query_handler(text="Start")
+async def start_callback(query: CallbackQuery):
+    await query.message.edit_text(text=start_text, reply_markup=kb.keyboard)
+
 # Обработичк нажатия кнопки для прохождения теста профориентации
 @router.message(Text(text = text.prof_true))
 async def process_prof_true_hendler(message: Message) -> None:
@@ -27,3 +33,5 @@ async def process_prof_false_hendler(message: Message) -> None:
 async def process_help_command(message: Message):
     await message.answer(text.help)
 
+#@router.message(Command(commands = ["back"]))
+#async def process_back_
