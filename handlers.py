@@ -65,6 +65,7 @@ async def process_back_handler(message: Message, state: FSMContext) -> None:
     else:
         await message.answer("Нет действий для возврата в данном состоянии.")
 
+
 # Обработичк нажатия кнопки пройти занаво в тесте
 @router.message(Text(text = text.reset))
 async def process_prof_restart_handler(message: Message) -> None:
