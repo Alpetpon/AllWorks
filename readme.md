@@ -15,8 +15,8 @@
 # Информация о боте 
 
 - Назавание: AllWorks 
-- user name: @AllWorks_tg_bot
-- Ссылка на бота: t.me/AllWorks_tg_bot
+- user name: @@AllWorksOfficial_Bot
+- Ссылка на бота: t.me/AllWorksOfficial_Bot
 
 # Инфрмация по разработке 
 
