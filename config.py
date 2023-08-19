@@ -1,1 +1,2 @@
 BOT_TOKEN = "6638436705:AAFsw-ScDPWuatwXf0baRh3yZZ2SSSMNSOg"
+admin_alex_id = 1926704070
