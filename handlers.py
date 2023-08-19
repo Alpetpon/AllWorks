@@ -5,6 +5,7 @@ from aiogram.filters.state import State, StatesGroup
 from aiogram.filters.command import Command
 from aiogram.types import Message
 import text, kb, config
+import Database as db
 
 
 router = Router()
@@ -28,11 +29,24 @@ class resume(StatesGroup):
 # Обработчик команды /start
 @router.message(Command(commands=["start"]))
 async def Start_handler(message: Message, state: FSMContext):
-    await state.set_state(Search.start)
-    await message.answer(text.greet.format(name=message.from_user.full_name), reply_markup=kb.start_keyboard)
+    cur = db.db.cursor()
+    cur.execute(f"SELECT block FROM users WHERE user_id = {message.chat.id}")
+    result = cur.fetchone()
     if message.from_user.id == int(config.admin_alex_id):
         await message.answer("Вы авторизовались как администратор!", reply_markup= kb.admin_panel)
         await state.set_state(Search.admin_panel)
+    else:
+        if result is None:
+            cur = db.db.cursor()
+            cur.execute(f'''SELECT * FROM users WHERE (user_id="{message.from_user.id}")''')
+            entry = cur.fetchone()
+            if entry is None:
+                cur.execute(f'''INSERT INTO users VALUES ('{message.from_user.id}', '0')''')
+                db.db.commit()
+                await message.answer(text.greet.format(name=message.from_user.full_name),
+                                     reply_markup=kb.start_keyboard)
+        else:
+            await message.answer('Ты был заблокирован!')
 
 
 # Обработчик создания резюме или просмотра вакансий
@@ -94,3 +108,11 @@ async def cmd_id(message: Message):
 async def Admin_panel(message: Message):
     if message.from_user.id == int(config.admin_alex_id):
         await message.answer(text.admin_panel, reply_markup = kb.Main_panel)
+
+# Собираем статистику бота
+@router.message(Text(text=text.stat))
+async def hfandler(message: Message, state: FSMContext):
+    cur = db.db.cursor()
+    cur.execute('''select * from users''')
+    results = cur.fetchall()
+    await message.answer(f'Людей которые когда либо заходили в бота: {len(results)}')
