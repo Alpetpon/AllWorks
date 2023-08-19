@@ -4,6 +4,7 @@ from aiogram import Bot, Dispatcher
 from config import BOT_TOKEN
 from handlers import router
 from set_menu import set_main_menu
+import Database as db
 
 async def main() -> None:
     dp = Dispatcher()
@@ -13,6 +14,15 @@ async def main() -> None:
     await dp.start_polling(bot)
 
 
-if __name__ == "__main__":
+async def on_data():
+    await db.db_start()
+    print("Бот успешно запущен")
+
+
+async def run_bot():
     logging.basicConfig(level=logging.INFO)
-    asyncio.run(main())
+    await on_data()
+    await main()
+
+if __name__ == "__main__":
+    asyncio.run(run_bot())
