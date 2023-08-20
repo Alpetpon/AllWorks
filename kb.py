@@ -10,10 +10,11 @@ start_keyboard: ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard=[[start_searc
 Create_resume: KeyboardButton = KeyboardButton(text=text.create_resume)
 Create_resume_II: KeyboardButton = KeyboardButton(text=text.create_resume_II)
 Check_job: KeyboardButton = KeyboardButton(text=text.check_job)
+Show_resume: KeyboardButton = KeyboardButton(text = text.show_resume)
 
 
 # Клавиатура №2
-Main_keyboard: ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard=[[Create_resume], [Create_resume_II], [Check_job]],
+Main_keyboard: ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard=[[Create_resume], [Create_resume_II], [Check_job], [Show_resume]],
                                                           resize_keyboard=True) # Клавиатура главного меню
 
 like_button: KeyboardButton = KeyboardButton(text=text.like)
@@ -37,7 +38,29 @@ Block_button:KeyboardButton = KeyboardButton(text = text.block_text)
 Unlock_button:KeyboardButton = KeyboardButton(text = text.unlock_text)
 
 # Клавиатура №5
-Main_panel:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[Stat_button], [Block_button], [Unlock_button], [Back_button]])
+Main_panel:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard=[[Stat_button], [Block_button], [Unlock_button], [Back_button]])
+
+
+Cancel_button:KeyboardButton = KeyboardButton(text = text.cancel)
+
+# Клавиатура №6
+Cancel_panel:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard=[[Cancel_button]])
+
+
+Male_button: KeyboardButton = KeyboardButton(text = text.male)
+Female_button: KeyboardButton = KeyboardButton(text = text.female)
+Undefined_button: KeyboardButton = KeyboardButton(text = text.undefined)
+
+# Клавиатура №7
+Sex_keyboard:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard=[[Male_button], [Female_button], [Undefined_button]])
+
+
+
+High: KeyboardButton = KeyboardButton(text = text.high)
+Secondary: KeyboardButton = KeyboardButton(text = text.second)
+No_edu: KeyboardButton = KeyboardButton(text = text.no_edu)
+# Клавиатура №8
+Education_keyboard:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[High], [Secondary], [No_edu]])
 
 
 
