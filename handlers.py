@@ -4,19 +4,22 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters.state import State, StatesGroup, StateFilter
 from aiogram.filters.command import Command
 from aiogram.fsm.state import default_state
-from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.redis import RedisStorage, Redis
 from aiogram.types import Message, CallbackQuery, PhotoSize, InlineKeyboardButton, InlineKeyboardMarkup
 from typing import Union
 import text, kb, config
 import Database as db
 
 router = Router()
-# Инициализируем хранилище (создаем экземпляр класса MemoryStorage)
-storage: MemoryStorage = MemoryStorage()
+
+
+# Инициализируем Redis
+redis: Redis = Redis(host='localhost')
+
+storage: RedisStorage = RedisStorage(redis=redis)
 
 # Создаем "базу данных" пользователей
 user_dict: dict[int, dict[str, Union[str, int, bool]]] = {}
-
 
 
 # Класс состояний бота
@@ -28,6 +31,8 @@ class Search(StatesGroup):
     create_resume = State()  # Создание резюме
     admin_panel = State() # Панель админа бота
 
+
+
 # Класс состояний пользователя в резюме
 class Resume(StatesGroup):
     start = State()
@@ -38,6 +43,7 @@ class Resume(StatesGroup):
     gender = State()
     photo = State()
     education = State()
+    wish_news = State()
 
 
 
@@ -63,13 +69,33 @@ async def Main_hendler(message: Message, state: FSMContext):
 
 # Блок для создания резюме вручную
 
-# Этот хэндлер будет срабатывать на "Создать резюме"
+# Этот хэндлер будет срабатывать на команду "/cancel" в состоянии
+# по умолчанию и сообщать, что эта команда работает внутри машины состояний
+@router.message(Command(commands='cancel'), StateFilter(default_state))
+async def process_cancel_command(message: Message):
+    await message.answer(text='Отменять нечего. Вы вне машины состояний\n\n'
+                              'Чтобы перейти к заполнению анкеты - '
+                              'отправьте команду /fillform')
+
+
+# Этот хэндлер будет срабатывать на команду "/cancel" в любых состояниях,
+# кроме состояния по умолчанию, и отключать машину состояний
+@router.message(Command(commands='cancel'), ~StateFilter(default_state))
+async def process_cancel_command_state(message: Message, state: FSMContext):
+    await message.answer(text='Вы вышли из машины состояний\n\n'
+                              'Чтобы снова перейти к заполнению анкеты - '
+                              'отправьте команду /fillform')
+    # Сбрасываем состояние и очищаем данные, полученные внутри состояний
+    await state.clear()
+
+# Этот хэндлер будет срабатывать на команду /fillform
 # и переводить бота в состояние ожидания ввода имени
-@router.message(Text(text = text.create_resume))
-async def fillname_command(message: Message, state: FSMContext):
-    await message.answer(text='Пожалуйста, введите ваше имя')
+@router.message(Text(text=text.create_resume_II))
+async def Fillform_command(message: Message, state: FSMContext):
+    await message.answer(text='Пожалуйста, введите ваше имя', reply_markup=kb.Cancel_keyboard)
     # Устанавливаем состояние ожидания ввода имени
     await state.set_state(Resume.name)
+
 
 # Этот хэндлер будет срабатывать, если введено корректное имя
 # и переводить в состояние ожидания ввода возраста
@@ -81,21 +107,22 @@ async def Name_sent(message: Message, state: FSMContext):
     # Устанавливаем состояние ожидания ввода возраста
     await state.set_state(Resume.age)
 
+
 # Этот хэндлер будет срабатывать, если во время ввода имени
 # будет введено что-то некорректное
 @router.message(StateFilter(Resume.name))
-async def warning_not_name(message: Message):
+async def Not_name(message: Message):
     await message.answer(text='То, что вы отправили не похоже на имя\n\n'
                               'Пожалуйста, введите ваше имя\n\n'
                               'Если вы хотите прервать заполнение анкеты - '
                               'отправьте команду /cancel')
 
+
 # Этот хэндлер будет срабатывать, если введен корректный возраст
 # и переводить в состояние выбора пола
-
 @router.message(StateFilter(Resume.age),
             lambda x: x.text.isdigit() and 4 <= int(x.text) <= 120)
-async def process_age_sent(message: Message, state: FSMContext):
+async def Age_sent(message: Message, state: FSMContext):
     # Cохраняем возраст в хранилище по ключу "age"
     await state.update_data(age=message.text)
     # Создаем объекты инлайн-кнопок
@@ -116,20 +143,22 @@ async def process_age_sent(message: Message, state: FSMContext):
     # Устанавливаем состояние ожидания выбора пола
     await state.set_state(Resume.gender)
 
+
 # Этот хэндлер будет срабатывать, если во время ввода возраста
 # будет введено что-то некорректное
 @router.message(StateFilter(Resume.age))
-async def warning_not_age(message: Message):
+async def Not_age(message: Message):
     await message.answer(
         text='Возраст должен быть целым числом от 4 до 120\n\n'
              'Попробуйте еще раз\n\nЕсли вы хотите прервать '
              'заполнение анкеты - отправьте команду /cancel')
 
+
 # Этот хэндлер будет срабатывать на нажатие кнопки при
 # выборе пола и переводить в состояние отправки фото
 @router.callback_query(StateFilter(Resume.gender),
                    Text(text=['male', 'female', 'undefined_gender']))
-async def process_gender_press(callback: CallbackQuery, state: FSMContext):
+async def Gender_press(callback: CallbackQuery, state: FSMContext):
     # Cохраняем пол (callback.data нажатой кнопки) в хранилище,
     # по ключу "gender"
     await state.update_data(gender=callback.data)
@@ -141,10 +170,11 @@ async def process_gender_press(callback: CallbackQuery, state: FSMContext):
     # Устанавливаем состояние ожидания загрузки фото
     await state.set_state(Resume.photo)
 
+
 # Этот хэндлер будет срабатывать, если во время выбора пола
 # будет введено/отправлено что-то некорректное
 @router.message(StateFilter(Resume.gender))
-async def warning_not_gender(message: Message):
+async def Not_gender(message: Message):
     await message.answer(text='Пожалуйста, пользуйтесь кнопками '
                               'при выборе пола\n\nЕсли вы хотите прервать '
                               'заполнение анкеты - отправьте команду /cancel')
@@ -180,9 +210,9 @@ async def process_photo_sent(message: Message,
     # Устанавливаем состояние ожидания выбора образования
     await state.set_state(Resume.education)
 
+
 # Этот хэндлер будет срабатывать, если во время отправки фото
 # будет введено/отправлено что-то некорректное
-
 @router.message(StateFilter(Resume.photo))
 async def warning_not_photo(message: Message):
     await message.answer(text='Пожалуйста, на этом шаге отправьте '
@@ -194,27 +224,70 @@ async def warning_not_photo(message: Message):
 # и переводить в состояние согласия получать новости
 @router.callback_query(StateFilter(Resume.education),
                    Text(text=['secondary', 'higher', 'no_edu']))
-async def process_education_press(callback: CallbackQuery, state: FSMContext):
+async def Education_press(callback: CallbackQuery, state: FSMContext):
     # Cохраняем данные об образовании по ключу "education"
     await state.update_data(education=callback.data)
+    # Создаем объекты инлайн-кнопок
+    yes_news_button = InlineKeyboardButton(text='Да',
+                                           callback_data='yes_news')
+    no_news_button = InlineKeyboardButton(text='Нет, спасибо',
+                                          callback_data='no_news')
+    # Добавляем кнопки в клавиатуру в один ряд
+    keyboard: list[list[InlineKeyboardButton]] = [
+                                    [yes_news_button,
+                                     no_news_button]]
+    # Создаем объект инлайн-клавиатуры
+    markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+    # Редактируем предыдущее сообщение с кнопками, отправляя
+    # новый текст и новую клавиатуру
+    await callback.message.edit_text(text='Спасибо!\n\n'
+                                          'Остался последний шаг.\n'
+                                          'Хотели бы вы получать новости?',
+                                     reply_markup=markup)
+    # Устанавливаем состояние ожидания выбора получать новости или нет
+    await state.set_state(Resume.wish_news)
 
 
-# Обработчик кнопки "Назад"
-@router.message(lambda message: message.text == text.back)
-async def Back_button(message: Message, state: FSMContext):
-    curent_state = await state.get_state()
-    if curent_state == Search.hub_choose_job:
-        await state.set_state(Search.hub_create_resume)
-        await message.answer("Вы вернулись к созданию резюме", reply_markup=kb.Main_keyboard)
-    elif curent_state == Search.admin_panel:
-        await  state.set_state(Search.start)
-        await message.answer("Вы вернулись в начало", reply_markup=kb.start_keyboard)
-    else:
-        await message.answer("Нет такого состояния")
+# Этот хэндлер будет срабатывать, если во время выбора образования
+# будет введено/отправлено что-то некорректное
+@router.message(StateFilter(Resume.education))
+async def warning_not_education(message: Message):
+    await message.answer(text='Пожалуйста, пользуйтесь кнопками '
+                              'при выборе образования\n\nЕсли вы хотите '
+                              'прервать заполнение анкеты - отправьте '
+                              'команду /cancel')
+
+
+# Этот хэндлер будет срабатывать на выбор получать или
+# не получать новости и выводить из машины состояний
+@router.callback_query(StateFilter(Resume.wish_news),
+                   Text(text=['yes_news', 'no_news']))
+async def process_wish_news_press(callback: CallbackQuery, state: FSMContext):
+    # Cохраняем данные о получении новостей по ключу "wish_news"
+    await state.update_data(wish_news=callback.data == 'yes_news')
+    # Добавляем в "базу данных" анкету пользователя
+    # по ключу id пользователя
+    user_dict[callback.from_user.id] = await state.get_data()
+    # Завершаем машину состояний
+    await state.clear()
+    # Отправляем в чат сообщение о выходе из машины состояний
+    await state.set_state(Search.hub_create_resume)
+    await callback.message.edit_text(text='Спасибо! Ваши данные сохранены!\n\n')
+    await callback.message.answer('Вы можеете перейти к просмотру вакансий', reply_markup=kb.Main_keyboard)
+
+
+# Этот хэндлер будет срабатывать, если во время согласия на получение
+# новостей будет введено/отправлено что-то некорректное
+@router.message(StateFilter(Resume.wish_news))
+async def warning_not_wish_news(message: Message):
+    await message.answer(text='Пожалуйста, воспользуйтесь кнопками!\n\n'
+                              'Если вы хотите прервать заполнение анкеты - '
+                              'отправьте команду /cancel')
+
 
 # Этот хэндлер будет срабатывать на отправку команды /showdata
 # и отправлять в чат данные анкеты, либо сообщение об отсутствии данных
-@router.message(Text(text=text.show_resume), StateFilter(default_state))
+@router.message(Text(text=text.show_resume))
 async def process_showdata_command(message: Message):
     # Отправляем пользователю анкету, если она есть в "базе данных"
     if message.from_user.id in user_dict:
@@ -226,10 +299,25 @@ async def process_showdata_command(message: Message):
                     f'Образование: {user_dict[message.from_user.id]["education"]}\n')
     else:
         # Если анкеты пользователя в базе нет - предлагаем заполнить
-        await message.answer(text='Вы еще не заполняли анкету. '
-                                  'Чтобы приступить - отправьте '
-                                  'команду /fillform')
+        await message.answer(text='Вы еще не заполняли анкету.')
 
+@router.message(Text(text=text.check_job))
+async def check_command(message: Message, state: FSMContext):
+    await state.set_state(Search.hub_choose_job)
+    await message.answer(text.test, reply_markup=kb.live_check_job)
+
+# Обработчик кнопки "Назад"
+@router.message(lambda message: message.text == text.back)
+async def process_back_button(message: Message, state: FSMContext) -> None:
+    current_state = await state.get_state()
+    if current_state == Search.hub_choose_job:
+        await state.set_state(Search.hub_create_resume)
+        await message.answer("Вы вернулись к созданию резюме.", reply_markup=kb.Main_keyboard)
+    elif current_state == Search.admin_panel:
+        await  state.set_state(Search.start)
+        await message.answer("Вы вернулись в начало.", reply_markup=kb.start_keyboard)
+    else:
+        await message.answer("Нет такого состояния")
 
 # Обработчик команды /help
 @router.message(Command(commands=['help']))
