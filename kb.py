@@ -14,7 +14,7 @@ Show_resume: KeyboardButton = KeyboardButton(text = text.show_resume)
 
 
 # Клавиатура №2
-Main_keyboard: ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard=[[Create_resume], [Create_resume_II], [Check_job], [Show_resume]],
+Main_keyboard: ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard=[[Create_resume, Create_resume_II], [Check_job, Show_resume]],
                                                           resize_keyboard=True) # Клавиатура главного меню
 
 like_button: KeyboardButton = KeyboardButton(text=text.like)
@@ -63,7 +63,9 @@ No_edu: KeyboardButton = KeyboardButton(text = text.no_edu)
 Education_keyboard:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[High], [Secondary], [No_edu]])
 
 
+Cancel: KeyboardButton = KeyboardButton(text = text.cancel)
 
+Cancel_keyboard:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[Cancel]])
 
 # Клавиатура пока не используется
 spec_button: KeyboardButton = KeyboardButton(text=text.spis)
