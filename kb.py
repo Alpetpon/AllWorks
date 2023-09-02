@@ -35,6 +35,7 @@ Main_panel:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard=[[Stat_button], [B
 
 #Кнопка для перехода к просмотру вакансий
 Check_vac: KeyboardButton = KeyboardButton(text = text.job)
+Re_write: KeyboardButton = KeyboardButton(text = text.re)
 #Клавиатура для перехода к просмотру вакансий
-job_keyboard:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[Check_vac]])
+job_keyboard:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[Check_vac], [Re_write]])
 
