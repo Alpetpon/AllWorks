@@ -24,13 +24,14 @@ redis: Redis = Redis(host='localhost')
 storage: RedisStorage = RedisStorage(redis=redis)
 
 
+# Ваш словарь для хранения данных пользователей
+user_data_dict = {}
+
+
 # Определяем группу состояний для бота
 class Bot(StatesGroup):
     start = State()
     admin_panel = State()
-    set_job = State()
-    set_salary = State()
-    set_town = State()
 
 
 # Определяем группу состояний для резюме пользователя
@@ -39,7 +40,9 @@ class Resume(StatesGroup):
     job = State()
     salary = State()
     town = State()
+    Choise = State()
     Check = State()
+
 
 
 # Функция для проверки зарплаты
@@ -70,34 +73,48 @@ async def Start_handler(message: Message, state: FSMContext):
     await db.cmd_start_db(message.from_user.id, message.from_user.username)
     await state.set_state(Bot.start)
     if message.from_user.id == int(config.admin_alex_id):
-        await message.answer("Вы авторизовались как администратор!", reply_markup=kb.admin_panel)
+        await message.answer(
+            "Вы авторизовались как администратор!",
+            reply_markup=kb.admin_panel
+        )
         await state.set_state(Bot.admin_panel)
     else:
-        await message.answer(text.greet.format(name=message.from_user.full_name), reply_markup=kb.start_keyboard)
+        await message.answer(text.greet.format(
+            name=message.from_user.full_name),
+            reply_markup=kb.start_keyboard
+        )
+
 
 
 # Обработчик для текста "Начать поиск работы!"
 @router.message(Text(text=text.start_search_job))
 async def Fillform_command(message: Message, state: FSMContext):
     keyboard = types.ReplyKeyboardRemove()
-    await message.answer(text='Пожалуйста введите желаемую должность ', reply_markup=keyboard)
-    await state.set_state(Bot.set_job)
+    await message.answer(
+        text='Пожалуйста введите желаемую должность ',
+        reply_markup=keyboard
+    )
     await state.set_state(Resume.job)
 
 
-# Обработчик для сообщений в состоянии Введите желаемую работу
+# В обработчике для ввода должности
 @router.message(StateFilter(Resume.job))
 async def job_sent(message: Message, state: FSMContext):
+    user_id = message.from_user.id
     job = message.text
 
-    # Проверяем данные на "дурака"
     if not is_valid_job(job):
         await message.answer("Пожалуйста, введите корректную должность!")
         return
 
-    await state.update_data(job=job)
+
+    user_data_dict[user_id] = {
+        'job': job,
+        'salary': None,
+        'town': None,
+    }
+
     await message.answer(text='Спасибо!\n\nА теперь введите желаемую заработную плату:')
-    await state.set_state(Bot.set_salary)
     await state.set_state(Resume.salary)
 
 
@@ -105,13 +122,13 @@ async def job_sent(message: Message, state: FSMContext):
 @router.message(StateFilter(Resume.job))
 async def salary_sent(message: Message, state: FSMContext):
     await state.update_data(job=message.text)
-    await state.set_state(Bot.set_salary)
     await state.set_state(Resume.salary)
 
 
 # Обработчик для сообщений в состоянии Введите желаемую зарплату
 @router.message(StateFilter(Resume.salary))
 async def salary_sent(message: Message, state: FSMContext):
+    user_id = message.from_user.id
     salary = message.text
 
     # Проверяем данные на "дурака"
@@ -119,9 +136,13 @@ async def salary_sent(message: Message, state: FSMContext):
         await message.answer("Пожалуйста, введите корректную зарплату (положительное число)!")
         return
 
+
+    user_data = user_data_dict.get(user_id, {})
+    user_data['salary'] = salary
+    user_data_dict[user_id] = user_data
+
     await state.update_data(salary=salary)
     await message.answer(text='И последнее перед тем как найти вам работу, введите ваш город:')
-    await state.set_state(Bot.set_town)
     await state.set_state(Resume.town)
 
 
@@ -129,13 +150,13 @@ async def salary_sent(message: Message, state: FSMContext):
 @router.message(StateFilter(Resume.salary))
 async def town_sent(message: Message, state: FSMContext):
     await state.update_data(salary=message.text)
-    await state.set_state(Bot.set_town)
     await state.set_state(Resume.town)
 
 
 # Обработчик для сообщений в состоянии Введите ваш город
 @router.message(StateFilter(Resume.town))
 async def town_sent(message: Message, state: FSMContext):
+    user_id = message.from_user.id
     town = message.text
 
     # Проверяем данные на "дурака"
@@ -143,15 +164,13 @@ async def town_sent(message: Message, state: FSMContext):
         await message.answer("Пожалуйста, введите корректный город!")
         return
 
+    user_data = user_data_dict.get(user_id, {})
+    user_data['town'] = town
+    user_data_dict[user_id] = user_data
+
     await state.update_data(town=town)
     await message.answer(text='Спасибо, теперь можно перейти в просмотр вакансий', reply_markup=kb.job_keyboard)
-
-
-# Обработчик для сообщений в состоянии  Введите ваш город
-@router.message(StateFilter(Resume.town))
-async def close_test(message: Message, state: FSMContext):
-    await state.update_data(town=message.text)
-    await message.answer(text='Спасибо, теперь можно перейти в просмотру вакансий', reply_markup=kb.job_keyboard)
+    await state.clear()
 
 
 
@@ -163,6 +182,19 @@ async def re_start(message: Message, state: FSMContext):
     await message.answer(text='Пожалуйста введите желаемую должность:',reply_markup=keyboard )
     await state.set_state(Resume.job)
 
+
+async def city_name_to_code(city_name):
+    async with aiohttp.ClientSession() as session:
+        url = 'https://api.hh.ru/areas'
+        async with session.get(url) as response:
+            if response.status == 200:
+                data = await response.json()
+                print(data)  # Отладочный вывод
+                for area in data:
+                    if area['name'] == city_name:
+                        return area['id']
+                print(f"City name '{city_name}' not found in HH API data.")  # Отладочный вывод
+            return None
 
 async def search_hh_vacancies(job, salary, town):
     async with aiohttp.ClientSession() as session:
@@ -179,20 +211,34 @@ async def search_hh_vacancies(job, salary, town):
             else:
                 return None
 
+
 @router.message(Text(text=text.job))
 async def check_handler(message: Message, state: FSMContext):
-    user_data = await state.get_data()
-    job = user_data.get('job', 'Не указано')
-    salary = user_data.get('salary', 'Не указано')
-    town = user_data.get('town', 'Не указано')
-    vacancies = await search_hh_vacancies(job, salary, town)
+    user_id = message.from_user.id
+    user_data = user_data_dict.get(user_id, None)
 
     job = user_data.get('job', 'Не указано')
-    salary = user_data.get('salary', 'Не указано')
-    town = user_data.get('town', 'Не указано')
+    salary_min = user_data.get('salary_min', 0)
+    salary_max = user_data.get('salary_max', 1000000)
+
+    # Получаем название города от пользователя
+    city_name = user_data.get('town', 'Не указано')
+    print(city_name)
+
+    # Преобразуем название города в код города
+    area_code = await city_name_to_code(city_name)
+    print(area_code)
+
+    if area_code is None:
+        await message.answer("Извините, название города не распознано.")
+        return
+
+    vacancies = await search_hh_vacancies(job, salary_min, salary_max, area_code)
+
     print("Job:", job)  # Отладочное сообщение
-    print("Salary:", salary)  # Отладочное сообщение
-    print("Town:", town)  # Отладочное сообщение
+    print("Salary_min:", salary_min)  # Отладочное сообщение
+    print("salary_max", salary_max)
+    print("Town:", area_code)  # Отладочное сообщение
     print("Vacancies:", vacancies)  # Отладочное сообщение
 
     if vacancies:

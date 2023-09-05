@@ -31,11 +31,11 @@ Block_button:KeyboardButton = KeyboardButton(text = text.block_text)
 Unlock_button:KeyboardButton = KeyboardButton(text = text.unlock_text)
 
 #Клавиатура для админ панели
-Main_panel:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard=[[Stat_button], [Block_button], [Unlock_button], [Back_button]])
+Main_panel:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard=[[Stat_button], [Block_button], [Unlock_button], [Back_button]], resize_keyboard=True)
 
 #Кнопка для перехода к просмотру вакансий
 Check_vac: KeyboardButton = KeyboardButton(text = text.job)
 Re_write: KeyboardButton = KeyboardButton(text = text.re)
 #Клавиатура для перехода к просмотру вакансий
-job_keyboard:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[Check_vac], [Re_write]])
+job_keyboard:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[Check_vac], [Re_write]], resize_keyboard=True)
 
