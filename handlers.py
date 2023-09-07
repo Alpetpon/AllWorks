@@ -277,13 +277,24 @@ def update_current_index(user_id, index):
     user_data['current_index'] = index
     user_vacancy_data[user_id] = user_data
 
+
 async def send_next_vacancy(user_id, message):
     vacancy, current_index = get_next_vacancy(user_id)
     if vacancy is not None:
+        salary_info = vacancy.get('salary')
+        if salary_info:
+            salary_from = salary_info.get('from')
+            salary_currency = salary_info.get('currency')
+        else:
+            salary_from = 'Не указано'
+            salary_currency = 'Не указано'
+
         title = vacancy.get('name', 'Не указано')
         employer = vacancy.get('employer', {}).get('name', 'Не указано')
-        salary = vacancy.get('salary', {}).get('from', 'Не указано')
-        await message.answer(f"Название: {title}\nРаботодатель: {employer}\nЗарплата от: {salary}")
+
+        await message.answer(
+            f"Название: {title}\nРаботодатель: {employer}\nЗарплата от: {salary_from} {salary_currency}")
+
         update_current_index(user_id, current_index + 1)
     else:
         await message.answer("Вы просмотрели все доступные вакансии.")
