@@ -44,3 +44,16 @@ Yes_button: KeyboardButton = KeyboardButton(text = text.yes)
 No_button: KeyboardButton = KeyboardButton(text = text.no)
 
 yes_no_keyboard:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[Yes_button], [No_button]], resize_keyboard=True)
+
+
+rus_button: KeyboardButton = KeyboardButton(text = text.rossia)
+usb_button: KeyboardButton = KeyboardButton(text = text.uzbek)
+kaz_button: KeyboardButton = KeyboardButton(text = text.kazah)
+gruz_button: KeyboardButton = KeyboardButton(text = text.gruzia)
+bel_button: KeyboardButton = KeyboardButton(text = text.belrus)
+azer_button: KeyboardButton = KeyboardButton(text = text.azer)
+kirgiz_button: KeyboardButton = KeyboardButton(text = text.kirgiz)
+other_button: KeyboardButton = KeyboardButton(text = text.other)
+
+
+country_keyboard: ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[rus_button], [gruz_button], [kaz_button], [gruz_button], [bel_button], [azer_button], [kirgiz_button], [other_button]], resize_keyboard=True)

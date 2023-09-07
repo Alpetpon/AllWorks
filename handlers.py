@@ -8,6 +8,7 @@ from aiogram.fsm.storage.redis import RedisStorage, Redis
 from aiogram import types
 from aiogram.types import Message
 
+
 # Импортируем  модули необходимые для работы
 import text, kb, config
 import Database as db
@@ -149,7 +150,7 @@ async def salary_sent(message: Message, state: FSMContext):
     user_data_dict[user_id] = user_data
 
     await state.update_data(salary=salary)
-    await message.answer(text='И последнее перед тем как найти вам работу, введите вашу Страну:')
+    await message.answer(text='И последнее перед тем как найти вам работу, введите вашу Страну:', reply_markup=kb.country_keyboard)
     await state.set_state(Resume.country)
 
 
@@ -161,24 +162,32 @@ async def town_sent(message: Message, state: FSMContext):
 
 
 # Обработчик для ввода страны
-@router.message(StateFilter(Resume.country))
-async def country_sent(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    country = message.text
 
-    # Проверьте данные на "дурака"
-    if not is_valid_country(country):
-        await message.answer("Пожалуйста, введите корректную страну!")
-        return
+
+# Добавляем обработчик для выбора страны
+
+@router.message(Text(text=(text.rossia, text.uzbek, text.kazah, text.gruzia, text.belrus, text.azer, text.kirgiz, text.other)))
+async def county_sent(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    chosen_country = message.text
+    await state.update_data(chosen_country=chosen_country)  # Сохраняем выбранную страну в данных пользователя
+    keyboard = types.ReplyKeyboardRemove()
+    await message.answer(f"Вы выбрали страну: {chosen_country}", keyboard = types.ReplyKeyboardRemove())
 
     # Сохраните страну в данных пользователя
     user_data = user_data_dict.get(user_id, {})
-    user_data['country'] = country
-    user_data_dict[user_id] = user_data
+    user_data['country'] =  chosen_country
+    user_data_dict[user_id] =user_data
 
-    await state.update_data(country=country)
-    await message.answer(text='Теперь введите ваш город:')
+    await state.update_data(chosen_country=  chosen_country)
+    keyboard = types.ReplyKeyboardRemove()
+    await message.answer(
+        text='Теперь введите ваш город:',
+        reply_markup=keyboard
+    )
     await state.set_state(Resume.town)
+
+
 
 
 # Обработчик для сообщений в состоянии Введите ваш город
@@ -323,6 +332,7 @@ async def check_handler(message: Message, state: FSMContext):
 
     vacancies = await search_hh_vacancies(job, salary_min, country_code, area_code)
 
+    print("County", country)
     print("Job:", job)  # Отладочное сообщение
     print("Salary:", salary_min)  # Отладочное сообщение
     print("Town:", area_code)  # Отладочное сообщение
