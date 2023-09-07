@@ -11,7 +11,7 @@ from aiogram.types import Message
 # Импортируем  модули необходимые для работы
 import text, kb, config
 import Database as db
-#для работы api
+# для работы api
 import aiohttp
 
 # Создаем экземпляр маршрутизатора
@@ -23,15 +23,18 @@ redis: Redis = Redis(host='localhost')
 # Инициализируем RedisStorage для Машины Конечных Состояний (FSM)
 storage: RedisStorage = RedisStorage(redis=redis)
 
-
 # Ваш словарь для хранения данных пользователей
 user_data_dict = {}
 
 
 # Определяем группу состояний для бота
+# Определяем группу состояний для бота
 class Bot(StatesGroup):
     start = State()
     admin_panel = State()
+    like = State()
+    dislike = State()
+
 
 
 # Определяем группу состояний для резюме пользователя
@@ -39,10 +42,10 @@ class Resume(StatesGroup):
     start = State()
     job = State()
     salary = State()
+    country = State()
     town = State()
     Choise = State()
     Check = State()
-
 
 
 # Функция для проверки зарплаты
@@ -66,6 +69,12 @@ def is_valid_town(text):
     return bool(text)
 
 
+# Функция для проверки страны
+def is_valid_country(text):
+    # TODO: Добавьте дополнительные проверки на корректность ввода страны
+    return bool(text)
+
+
 # Обработчик для команды /start
 @router.message(Command(commands=["start"]))
 async def Start_handler(message: Message, state: FSMContext):
@@ -83,7 +92,6 @@ async def Start_handler(message: Message, state: FSMContext):
             name=message.from_user.full_name),
             reply_markup=kb.start_keyboard
         )
-
 
 
 # Обработчик для текста "Начать поиск работы!"
@@ -107,10 +115,10 @@ async def job_sent(message: Message, state: FSMContext):
         await message.answer("Пожалуйста, введите корректную должность!")
         return
 
-
     user_data_dict[user_id] = {
         'job': job,
         'salary': None,
+        'country': None,
         'town': None,
     }
 
@@ -136,20 +144,40 @@ async def salary_sent(message: Message, state: FSMContext):
         await message.answer("Пожалуйста, введите корректную зарплату (положительное число)!")
         return
 
-
     user_data = user_data_dict.get(user_id, {})
     user_data['salary'] = salary
     user_data_dict[user_id] = user_data
 
     await state.update_data(salary=salary)
-    await message.answer(text='И последнее перед тем как найти вам работу, введите ваш город:')
-    await state.set_state(Resume.town)
+    await message.answer(text='И последнее перед тем как найти вам работу, введите вашу Страну:')
+    await state.set_state(Resume.country)
 
 
 # Обработчик для сообщений в состоянии Введите желаемую зарплату
 @router.message(StateFilter(Resume.salary))
 async def town_sent(message: Message, state: FSMContext):
     await state.update_data(salary=message.text)
+    await state.set_state(Resume.country)
+
+
+# Обработчик для ввода страны
+@router.message(StateFilter(Resume.country))
+async def country_sent(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    country = message.text
+
+    # Проверьте данные на "дурака"
+    if not is_valid_country(country):
+        await message.answer("Пожалуйста, введите корректную страну!")
+        return
+
+    # Сохраните страну в данных пользователя
+    user_data = user_data_dict.get(user_id, {})
+    user_data['country'] = country
+    user_data_dict[user_id] = user_data
+
+    await state.update_data(country=country)
+    await message.answer(text='Теперь введите ваш город:')
     await state.set_state(Resume.town)
 
 
@@ -173,36 +201,56 @@ async def town_sent(message: Message, state: FSMContext):
     await state.clear()
 
 
-
 # Обработчик для кнопки перезапуска теста
 @router.message(Text(text=text.re))
 async def re_start(message: Message, state: FSMContext):
     keyboard = types.ReplyKeyboardRemove()
     await message.answer("Вы начали процесс сбора данных заново.")
-    await message.answer(text='Пожалуйста введите желаемую должность:',reply_markup=keyboard )
+    await message.answer(text='Пожалуйста введите желаемую должность:', reply_markup=keyboard)
     await state.set_state(Resume.job)
 
 
-async def city_name_to_code(city_name):
+async def country_name_to_code(country_name):
     async with aiohttp.ClientSession() as session:
         url = 'https://api.hh.ru/areas'
         async with session.get(url) as response:
             if response.status == 200:
                 data = await response.json()
-                print(data)  # Отладочный вывод
                 for area in data:
-                    if area['name'] == city_name:
+                    if area['name'] == country_name:
                         return area['id']
-                print(f"City name '{city_name}' not found in HH API data.")  # Отладочный вывод
+                print(f"Country name '{country_name}' not found in HH API data.")  # Отладочный вывод
+            else:
+                print(f"Error response from HH API: {response.status}")  # Отладочный вывод
             return None
 
-async def search_hh_vacancies(job, salary, town):
+
+async def city_name_to_code(city_name, country_name):
+    async with aiohttp.ClientSession() as session:
+        url = 'https://api.hh.ru/areas'
+        async with session.get(url) as response:
+            if response.status == 200:
+                data = await response.json()
+                for country in data:
+                    if country['name'] == country_name:
+                        for area in country['areas']:
+                            if area['name'] == city_name:
+                                return area['id']
+                print(
+                    f"City name '{city_name}' not found in HH API data for country '{country_name}'.")  # Отладочный вывод
+            else:
+                print(f"Error response from HH API: {response.status}")  # Отладочный вывод
+            return None
+
+
+async def search_hh_vacancies(job, salary, country_code, area_code):
     async with aiohttp.ClientSession() as session:
         url = f'https://api.hh.ru/vacancies'
         params = {
             'text': job,
             'salary': salary,
-            'area': town,
+            'area': area_code,
+            'country': country_code
         }
         async with session.get(url, params=params) as response:
             if response.status == 200:
@@ -211,47 +259,148 @@ async def search_hh_vacancies(job, salary, town):
             else:
                 return None
 
+user_vacancy_data = {}
 
+
+def get_next_vacancy(user_id):
+    user_data = user_vacancy_data.get(user_id, {})
+    vacancies = user_data.get('vacancies', [])
+    current_index = user_data.get('current_index', 0)
+
+    if current_index < len(vacancies):
+        return vacancies[current_index], current_index
+    else:
+        return None, None
+
+def update_current_index(user_id, index):
+    user_data = user_vacancy_data.get(user_id, {})
+    user_data['current_index'] = index
+    user_vacancy_data[user_id] = user_data
+
+async def send_next_vacancy(user_id, message):
+    vacancy, current_index = get_next_vacancy(user_id)
+    if vacancy is not None:
+        title = vacancy.get('name', 'Не указано')
+        employer = vacancy.get('employer', {}).get('name', 'Не указано')
+        salary = vacancy.get('salary', {}).get('from', 'Не указано')
+        await message.answer(f"Название: {title}\nРаботодатель: {employer}\nЗарплата от: {salary}")
+        update_current_index(user_id, current_index + 1)
+    else:
+        await message.answer("Вы просмотрели все доступные вакансии.")
+
+
+# Handler to start vacancy viewing
 @router.message(Text(text=text.job))
 async def check_handler(message: Message, state: FSMContext):
+    await message.answer(text='Вот, что мы смогли подобрать', reply_markup=kb.live_check_job)
     user_id = message.from_user.id
     user_data = user_data_dict.get(user_id, None)
-
     job = user_data.get('job', 'Не указано')
-    salary_min = user_data.get('salary_min', 0)
-    salary_max = user_data.get('salary_max', 1000000)
+    salary_min = int(user_data.get('salary', 20000))
+    country = user_data.get('country', 'Не указано')
+    town = user_data.get('town', 'Не указано')
 
-    # Получаем название города от пользователя
-    city_name = user_data.get('town', 'Не указано')
-    print(city_name)
+    country_code = await country_name_to_code(country)
+    area_code = await city_name_to_code(town, country)
 
-    # Преобразуем название города в код города
-    area_code = await city_name_to_code(city_name)
-    print(area_code)
 
-    if area_code is None:
-        await message.answer("Извините, название города не распознано.")
+
+    if country_code is None or area_code is None:
+        await message.answer(
+            f"Извините, название страны '{country}' или города '{town}' не распознано или не найдено в API HH.ru.")
         return
 
-    vacancies = await search_hh_vacancies(job, salary_min, salary_max, area_code)
+    vacancies = await search_hh_vacancies(job, salary_min, country_code, area_code)
 
     print("Job:", job)  # Отладочное сообщение
-    print("Salary_min:", salary_min)  # Отладочное сообщение
-    print("salary_max", salary_max)
+    print("Salary:", salary_min)  # Отладочное сообщение
     print("Town:", area_code)  # Отладочное сообщение
     print("Vacancies:", vacancies)  # Отладочное сообщение
 
+
     if vacancies:
-        await message.answer("Вот некоторые вакансии, которые соответствуют вашим критериям:")
-        for vacancy in vacancies:
-            title = vacancy.get('name', 'Не указано')
-            employer = vacancy.get('employer', {}).get('name', 'Не указано')
-            salary = vacancy.get('salary', {}).get('from', 'Не указано')
-            await message.answer(f"Название: {title}\nРаботодатель: {employer}\nЗарплата от: {salary}")
+        user_vacancy_data[user_id] = {'vacancies': vacancies, 'current_index': 0}
+        await send_next_vacancy(user_id, message)
     else:
         await message.answer("Извините, ничего не найдено по вашему запросу.")
 
+
+async def get_vacancy_url(vacancy_id):
+    async with aiohttp.ClientSession() as session:
+        url = f'https://api.hh.ru/vacancies/{vacancy_id}'
+        async with session.get(url) as response:
+            if response.status == 200:
+                data = await response.json()
+                return data.get('alternate_url')
+            else:
+                return None
+
+
+# Обработчик для кнопки "Лайк"
+@router.message(Text(text=text.like))
+async def like_handler(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    user_data = user_data_dict.get(user_id, {})
+    vacancy, current_index = get_next_vacancy(user_id)
+    if vacancy is not None:
+        vacancy_id = vacancy.get('id')
+        vacancy_url = await get_vacancy_url(vacancy_id)
+        if vacancy_url:
+            await message.answer(f"Вы лайкнули эту вакансию. Ссылка на вакансию: {vacancy_url}")
+        else:
+            await message.answer("Извините, не удалось получить ссылку на вакансию.")
+
+        # Спрашиваем, хотите ли вы посмотреть следующую вакансию
+        await message.answer("Хотите посмотреть следующую вакансию?", reply_markup=kb.yes_no_keyboard)
+        update_current_index(user_id, current_index + 1)
+    else:
+        await message.answer("Вы просмотрели все доступные вакансии.")
+
+
+# Обработчик для кнопки "Дизлайк"
+@router.message(Text(text=text.dis))
+async def dislike_handler(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    user_data = user_data_dict.get(user_id, {})
+    vacancy, current_index = get_next_vacancy(user_id)
+
+    if vacancy is not None:
+        await message.answer("Вы дислайкнули эту вакансию. Хотите посмотреть следующую?",
+                             reply_markup=kb.yes_no_keyboard)
+
+        # Переводим пользователя в состояние Dislike для ожидания дальнейших действий
+        await state.set_state(Bot.dislike)
+    else:
+        await message.answer("Вы просмотрели все доступные вакансии.")
+
+
+# Обработчик для кнопки "Да"
+@router.message(Text(text=text.yes))
+async def yes_handler(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    user_data = user_data_dict.get(user_id, {})
+    await message.answer("Обязательная заглушка(Можно сделать смайлик)", reply_markup=kb.live_check_job)
+    # Проверяем, есть ли следующая вакансия
+    vacancy, current_index = get_next_vacancy(user_id)
+    if vacancy is not None:
+        # Отправляем следующую вакансию
+        await send_next_vacancy(user_id, message)
+    else:
+        await message.answer("Вы просмотрели все доступные вакансии.")
+    # Сбрасываем состояние выбора "Да" или "Нет"
     await state.clear()
+
+
+
+# Обработчик для кнопки "Нет"
+@router.message(Text(text=text.no))
+async def no_handler(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    # Сбрасываем состояние выбора "Да" или "Нет"
+    await state.clear()
+    # Возвращаем пользователя в главное меню
+    await message.answer("Вы можете в любой момент продолжить просмотр вакансий.", reply_markup=kb.job_keyboard)
+
 
 # Обработчик для команды /help
 @router.message(Command(commands=['help']))

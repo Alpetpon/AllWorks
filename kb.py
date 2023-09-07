@@ -39,3 +39,8 @@ Re_write: KeyboardButton = KeyboardButton(text = text.re)
 #Клавиатура для перехода к просмотру вакансий
 job_keyboard:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[Check_vac], [Re_write]], resize_keyboard=True)
 
+
+Yes_button: KeyboardButton = KeyboardButton(text = text.yes)
+No_button: KeyboardButton = KeyboardButton(text = text.no)
+
+yes_no_keyboard:ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[Yes_button], [No_button]], resize_keyboard=True)
