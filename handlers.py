@@ -8,8 +8,7 @@ from aiogram.fsm.storage.redis import RedisStorage, Redis
 from aiogram import types
 from aiogram.types import Message
 
-
-# Импортируем  модули необходимые для работы
+# Импортируем модули необходимые для работы
 import text, kb, config
 import Database as db
 # для работы api
@@ -150,7 +149,7 @@ async def salary_sent(message: Message, state: FSMContext):
     user_data_dict[user_id] = user_data
 
     await state.update_data(salary=salary)
-    await message.answer(text='И последнее перед тем как найти вам работу, введите вашу Страну:', reply_markup=kb.country_keyboard)
+    await message.answer(text='И последнее перед тем как найти вам работу, введите вашу Страну:')
     await state.set_state(Resume.country)
 
 
@@ -162,39 +161,43 @@ async def town_sent(message: Message, state: FSMContext):
 
 
 # Обработчик для ввода страны
-
-
-# Добавляем обработчик для выбора страны
-
-@router.message(Text(text=(text.rossia, text.uzbek, text.kazah, text.gruzia, text.belrus, text.azer, text.kirgiz, text.other)))
-async def county_sent(message: Message, state: FSMContext):
+@router.message(StateFilter(Resume.country))
+async def country_sent(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    chosen_country = message.text
-    await state.update_data(chosen_country=chosen_country)  # Сохраняем выбранную страну в данных пользователя
-    keyboard = types.ReplyKeyboardRemove()
-    await message.answer(f"Вы выбрали страну: {chosen_country}", keyboard = types.ReplyKeyboardRemove())
+    country = message.text
+
+    # Проверьте данные на "дурака"
+    if not is_valid_country(country):
+        await message.answer("Пожалуйста, введите корректную страну!")
+        return
 
     # Сохраните страну в данных пользователя
     user_data = user_data_dict.get(user_id, {})
-    user_data['country'] =  chosen_country
-    user_data_dict[user_id] =user_data
+    user_data['country'] = country
+    user_data_dict[user_id] = user_data
 
-    await state.update_data(chosen_country=  chosen_country)
-    keyboard = types.ReplyKeyboardRemove()
-    await message.answer(
-        text='Теперь введите ваш город:',
-        reply_markup=keyboard
-    )
+    await state.update_data(country=country)
+    await message.answer(text='Теперь введите ваш город:')
     await state.set_state(Resume.town)
 
 
+# Функция для форматирования города с тире
+def format_city_name(city_name):
+    # Разбиваем город на слова и форматируем каждое слово
+    formatted_words = [word.capitalize() for word in city_name.split()]
+    # Объединяем слова с тире между ними
+    formatted_city = "-".join(formatted_words)
+    return formatted_city
 
 
 # Обработчик для сообщений в состоянии Введите ваш город
 @router.message(StateFilter(Resume.town))
 async def town_sent(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    town = message.text
+    text_input = message.text
+
+    # Форматируем город с тире
+    town = format_city_name(text_input)
 
     # Проверяем данные на "дурака"
     if not is_valid_town(town):
@@ -264,7 +267,13 @@ async def search_hh_vacancies(job, salary, country_code, area_code):
         async with session.get(url, params=params) as response:
             if response.status == 200:
                 data = await response.json()
-                return data.get('items', [])
+                vacancies = data.get('items', [])
+                for vacancy in vacancies:
+                    required_experience = vacancy.get('experience', {}).get('name', 'Не указано')
+                    employment = vacancy.get('employment', {}).get('name', 'Не указано')
+                    vacancy['required_experience'] = required_experience
+                    vacancy['employment'] = employment
+                return vacancies
             else:
                 return None
 
@@ -286,27 +295,28 @@ def update_current_index(user_id, index):
     user_data['current_index'] = index
     user_vacancy_data[user_id] = user_data
 
-
 async def send_next_vacancy(user_id, message):
     vacancy, current_index = get_next_vacancy(user_id)
     if vacancy is not None:
-        salary_info = vacancy.get('salary')
-        if salary_info:
-            salary_from = salary_info.get('from')
-            salary_currency = salary_info.get('currency')
-        else:
-            salary_from = 'Не указано'
-            salary_currency = 'Не указано'
-
         title = vacancy.get('name', 'Не указано')
         employer = vacancy.get('employer', {}).get('name', 'Не указано')
+        salary = vacancy.get('salary', {}).get('from', 'Не указано')
+        required_experience = vacancy.get('required_experience', 'Не указано')
+        employment = vacancy.get('employment', 'Не указано')
 
-        await message.answer(
-            f"Название: {title}\nРаботодатель: {employer}\nЗарплата от: {salary_from} {salary_currency}")
+        vacancy_message = f"<b>Название:</b> {title}\n" \
+                          f"<b>Работодатель:</b> {employer}\n" \
+                          f"<b>Зарплата от:</b> {salary}\n" \
+                          f"<b>Требуемый опыт:</b> {required_experience}\n" \
+                          f"<b>Занятость:</b> {employment}"
+
+        await message.answer(vacancy_message, parse_mode='HTML')
 
         update_current_index(user_id, current_index + 1)
     else:
         await message.answer("Вы просмотрели все доступные вакансии.")
+
+
 
 
 # Handler to start vacancy viewing
@@ -332,7 +342,6 @@ async def check_handler(message: Message, state: FSMContext):
 
     vacancies = await search_hh_vacancies(job, salary_min, country_code, area_code)
 
-    print("County", country)
     print("Job:", job)  # Отладочное сообщение
     print("Salary:", salary_min)  # Отладочное сообщение
     print("Town:", area_code)  # Отладочное сообщение

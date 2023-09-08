@@ -57,3 +57,10 @@ other_button: KeyboardButton = KeyboardButton(text = text.other)
 
 
 country_keyboard: ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[rus_button], [gruz_button], [kaz_button], [gruz_button], [bel_button], [azer_button], [kirgiz_button], [other_button]], resize_keyboard=True)
+
+
+Saintp: KeyboardButton = KeyboardButton(text = text.saintp)
+Moscow: KeyboardButton = KeyboardButton(text = text.moscow)
+Other: KeyboardButton = KeyboardButton(text = text.other_city)
+
+city_keyboard: ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[Saintp], [Moscow], [Other]])
