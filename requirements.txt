@@ -357,7 +357,6 @@ typing_extensions==4.6.3
 tzlocal==2.1
 urllib3==1.25.9
 virtualenv==20.0.31
-VKinder @ file:///Users/aleksey/vkinder
 voila==0.3.5
 wcwidth==0.2.5
 webdriverdownloader==1.1.0.3
