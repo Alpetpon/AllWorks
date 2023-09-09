@@ -64,3 +64,5 @@ Moscow: KeyboardButton = KeyboardButton(text = text.moscow)
 Other: KeyboardButton = KeyboardButton(text = text.other_city)
 
 city_keyboard: ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard = [[Saintp], [Moscow], [Other]])
+
+

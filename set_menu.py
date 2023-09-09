@@ -12,3 +12,6 @@ async def set_main_menu(bot: Bot):
 
     # Устанавливаем команды меню для бота
     await bot.set_my_commands(main_menu_commands)
+
+
+

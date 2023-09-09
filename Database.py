@@ -39,3 +39,6 @@ async def cmd_start_db(user_id, tg_username):
                                                                                                     username=tg_username))
         # Фиксируем изменения в базе данных
         db.commit()
+
+
+

@@ -28,3 +28,6 @@ async def run_bot():
 # Точка входа в программу
 if __name__ == "__main__":
     asyncio.run(run_bot())  # Запускаем бота с использованием asyncio
+
+
+
