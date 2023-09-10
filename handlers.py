@@ -1,6 +1,6 @@
 # Импортируем необходимые модули из библиотеки aiogram
 from aiogram import Router
-from aiogram.filters import Text
+from aiogram import Bot,F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters.state import State, StatesGroup, StateFilter
 from aiogram.filters.command import Command
@@ -27,7 +27,6 @@ storage: RedisStorage = RedisStorage(redis=redis)
 user_data_dict = {}
 
 
-# Определяем группу состояний для бота
 # Определяем группу состояний для бота
 class Bot(StatesGroup):
     start = State()
@@ -95,7 +94,8 @@ async def Start_handler(message: Message, state: FSMContext):
 
 
 # Обработчик для текста "Начать поиск работы!"
-@router.message(Text(text=text.start_search_job))
+
+@router.message(F.text == text.start_search_job)
 async def Fillform_command(message: Message, state: FSMContext):
     keyboard = types.ReplyKeyboardRemove()
     await message.answer(
@@ -133,7 +133,7 @@ async def salary_sent(message: Message, state: FSMContext):
     await state.set_state(Resume.salary)
 
 
-# Обработчик для сообщений в состоянии Введите желаемую зарплату
+# Обработчик для сообщений в состоянии введите желаемую зарплату
 @router.message(StateFilter(Resume.salary))
 async def salary_sent(message: Message, state: FSMContext):
     user_id = message.from_user.id
@@ -214,7 +214,7 @@ async def town_sent(message: Message, state: FSMContext):
 
 
 # Обработчик для кнопки перезапуска теста
-@router.message(Text(text=text.re))
+@router.message(F.text == text.re)
 async def re_start(message: Message, state: FSMContext):
     keyboard = types.ReplyKeyboardRemove()
     await message.answer("Вы начали процесс сбора данных заново.")
@@ -320,7 +320,8 @@ async def send_next_vacancy(user_id, message):
 
 
 # Handler to start vacancy viewing
-@router.message(Text(text=text.job))
+
+@router.message(F.text == text.job)
 async def check_handler(message: Message, state: FSMContext):
     await message.answer(text='Вот, что мы смогли подобрать', reply_markup=kb.live_check_job)
     user_id = message.from_user.id
@@ -367,7 +368,7 @@ async def get_vacancy_url(vacancy_id):
 
 
 # Обработчик для кнопки "Лайк"
-@router.message(Text(text=text.like))
+@router.message(F.text == text.like)
 async def like_handler(message: Message, state: FSMContext):
     user_id = message.from_user.id
     user_data = user_data_dict.get(user_id, {})
@@ -388,7 +389,7 @@ async def like_handler(message: Message, state: FSMContext):
 
 
 # Обработчик для кнопки "Дизлайк"
-@router.message(Text(text=text.dis))
+@router.message(F.text == text.dis)
 async def dislike_handler(message: Message, state: FSMContext):
     user_id = message.from_user.id
     user_data = user_data_dict.get(user_id, {})
@@ -405,7 +406,8 @@ async def dislike_handler(message: Message, state: FSMContext):
 
 
 # Обработчик для кнопки "Да"
-@router.message(Text(text=text.yes))
+
+@router.message(F.text == text.yes)
 async def yes_handler(message: Message, state: FSMContext):
     user_id = message.from_user.id
     user_data = user_data_dict.get(user_id, {})
@@ -423,7 +425,7 @@ async def yes_handler(message: Message, state: FSMContext):
 
 
 # Обработчик для кнопки "Нет"
-@router.message(Text(text=text.no))
+@router.message(F.text == text.no)
 async def no_handler(message: Message, state: FSMContext):
     user_id = message.from_user.id
     # Сбрасываем состояние выбора "Да" или "Нет"
@@ -445,7 +447,7 @@ async def cmd_id(message: Message):
 
 
 # Обработчик для текста "admin"
-@router.message(Text(text=text.admin))
+@router.message(F.text == text.admin)
 async def Admin_panel(message: Message):
     if message.from_user.id == int(config.admin_alex_id):
         await message.answer(text.admin_panel, reply_markup=kb.Main_panel)
