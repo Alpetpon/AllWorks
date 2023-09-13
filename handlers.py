@@ -8,6 +8,7 @@ from aiogram.fsm.storage.redis import RedisStorage, Redis
 from aiogram import types
 from aiogram.types import Message
 
+
 # Импортируем модули необходимые для работы
 import text, kb, config
 import Database as db
@@ -99,7 +100,7 @@ async def Start_handler(message: Message, state: FSMContext):
 async def Fillform_command(message: Message, state: FSMContext):
     keyboard = types.ReplyKeyboardRemove()
     await message.answer(
-        text='Пожалуйста введите желаемую должность ',
+        text="Пожалуйста, укажите желаемую должность или профессию, которую вы ищете.",
         reply_markup=keyboard
     )
     await state.set_state(Resume.job)
@@ -122,7 +123,7 @@ async def job_sent(message: Message, state: FSMContext):
         'town': None,
     }
 
-    await message.answer(text='Спасибо!\n\nА теперь введите желаемую заработную плату:')
+    await message.answer(text='Спасибо! Теперь укажите, какую заработную плату вы желаете получать.')
     await state.set_state(Resume.salary)
 
 
@@ -149,7 +150,7 @@ async def salary_sent(message: Message, state: FSMContext):
     user_data_dict[user_id] = user_data
 
     await state.update_data(salary=salary)
-    await message.answer(text='И последнее перед тем как найти вам работу, введите вашу Страну:')
+    await message.answer(text="Прекрасно, теперь укажите, в какой стране вы находитесь ?")
     await state.set_state(Resume.country)
 
 
@@ -177,16 +178,26 @@ async def country_sent(message: Message, state: FSMContext):
     user_data_dict[user_id] = user_data
 
     await state.update_data(country=country)
-    await message.answer(text='Теперь введите ваш город:')
+    await message.answer(text='И последний шаг перед тем, как мы найдем для вас идеальную работу - введите название вашего города. ')
     await state.set_state(Resume.town)
 
 
-# Функция для форматирования города с тире
 def format_city_name(city_name):
-    # Разбиваем город на слова и форматируем каждое слово
-    formatted_words = [word.capitalize() for word in city_name.split()]
-    # Объединяем слова с тире между ними
-    formatted_city = "-".join(formatted_words)
+    # Проверяем, соответствует ли город условиям для форматирования
+    if city_name not in ["Санкт-Петербург", "Ростов-на-Дону"]:
+        # Разбиваем город на слова
+        words = city_name.split()
+
+        # Форматируем каждое слово так, чтобы первая буква была заглавной,
+        # кроме слов в списке исключений
+        exceptions = ["на", "и", "с", "под", "к", "над", "для", "за", "по"]
+        formatted_words = [word.capitalize() if word not in exceptions else word for word in words]
+
+        # Объединяем слова с тире между ними
+        formatted_city = "-".join(formatted_words)
+    else:
+        formatted_city = city_name
+
     return formatted_city
 
 
@@ -262,7 +273,8 @@ async def search_hh_vacancies(job, salary, country_code, area_code):
             'text': job,
             'salary': salary,
             'area': area_code,
-            'country': country_code
+            'country': country_code,
+            'only_with_salary': 'True'
         }
         async with session.get(url, params=params) as response:
             if response.status == 200:
@@ -276,6 +288,7 @@ async def search_hh_vacancies(job, salary, country_code, area_code):
                 return vacancies
             else:
                 return None
+
 
 user_vacancy_data = {}
 
@@ -300,7 +313,15 @@ async def send_next_vacancy(user_id, message):
     if vacancy is not None:
         title = vacancy.get('name', 'Не указано')
         employer = vacancy.get('employer', {}).get('name', 'Не указано')
-        salary = vacancy.get('salary', {}).get('from', 'Не указано')
+        if vacancy is not None:
+            salary_data = vacancy.get('salary', {})
+            if salary_data is not None:
+                salary = salary_data.get('from', 'Не указано')
+            else:
+                salary = 'Не указано'
+        else:
+            salary = 'Не указано'
+
         required_experience = vacancy.get('required_experience', 'Не указано')
         employment = vacancy.get('employment', 'Не указано')
 
@@ -327,7 +348,7 @@ async def check_handler(message: Message, state: FSMContext):
     user_id = message.from_user.id
     user_data = user_data_dict.get(user_id, None)
     job = user_data.get('job', 'Не указано')
-    salary_min = int(user_data.get('salary', 20000))
+    salary_min = int(user_data.get('salary', "Не указано"))
     country = user_data.get('country', 'Не указано')
     town = user_data.get('town', 'Не указано')
 
@@ -347,6 +368,7 @@ async def check_handler(message: Message, state: FSMContext):
     print("Salary:", salary_min)  # Отладочное сообщение
     print("Town:", area_code)  # Отладочное сообщение
     print("Vacancies:", vacancies)  # Отладочное сообщение
+
 
 
     if vacancies:
@@ -371,10 +393,10 @@ async def get_vacancy_url(vacancy_id):
 @router.message(F.text == text.like)
 async def like_handler(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    user_data = user_data_dict.get(user_id, {})
     vacancy, current_index = get_next_vacancy(user_id)
     if vacancy is not None:
         vacancy_id = vacancy.get('id')
+        print(vacancy_id)
         vacancy_url = await get_vacancy_url(vacancy_id)
         if vacancy_url:
             await message.answer(f"Вы лайкнули эту вакансию. Ссылка на вакансию: {vacancy_url}")
@@ -406,12 +428,11 @@ async def dislike_handler(message: Message, state: FSMContext):
 
 
 # Обработчик для кнопки "Да"
-
 @router.message(F.text == text.yes)
 async def yes_handler(message: Message, state: FSMContext):
     user_id = message.from_user.id
     user_data = user_data_dict.get(user_id, {})
-    await message.answer("Обязательная заглушка(Можно сделать смайлик)", reply_markup=kb.live_check_job)
+    await message.answer("↓", reply_markup=kb.live_check_job)
     # Проверяем, есть ли следующая вакансия
     vacancy, current_index = get_next_vacancy(user_id)
     if vacancy is not None:
@@ -438,6 +459,7 @@ async def no_handler(message: Message, state: FSMContext):
 @router.message(Command(commands=['help']))
 async def process_help_command(message: Message):
     await message.answer(text.help.format(name=message.from_user.full_name))
+    await message.answer(text.help_text)
 
 
 # Обработчик для команды /id
